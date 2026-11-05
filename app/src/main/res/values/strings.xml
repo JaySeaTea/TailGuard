@@ -1,0 +1,155 @@
+<resources>
+    <string name="app_name">TailGuard</string>
+    <string name="app_tagline">Zero-leak hands-off VPN automation</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_trusted_networks">Trusted Nets</string>
+    <string name="nav_transition_logs">Logs</string>
+
+    <!-- Posture States -->
+    <string name="posture_vpn_active">VPN Protected</string>
+    <string name="posture_vpn_active_desc">Secure WireGuard tunnel verified</string>
+    <string name="posture_preemptive_shield">Pre-Emptive Wi-Fi Shield</string>
+    <string name="posture_preemptive_shield_desc">Weak Wi-Fi detected — tunnel connected early to eliminate 5G transition gap</string>
+    <string name="posture_trusted_bypass">Trusted Network Active</string>
+    <string name="posture_trusted_bypass_desc">Verified local network — VPN auto-connect paused to save battery</string>
+    <string name="posture_connecting">Handshake Pending</string>
+    <string name="posture_connecting_desc">Dispatched connect broadcast — waiting for tunnel interface</string>
+    <string name="posture_unprotected">Unprotected Connection</string>
+    <string name="posture_unprotected_desc">Untrusted network without active VPN tunnel</string>
+
+    <!-- Legacy posture strings -->
+    <string name="posture_tailscale_active">VPN Protected</string>
+    <string name="posture_tailscale_active_desc">Mesh WireGuard tunnel verified</string>
+    <string name="posture_kill_switch">Pre-Emptive Shield</string>
+    <string name="posture_kill_switch_desc">Pre-emptive Wi-Fi protection active</string>
+
+    <!-- Rapid One-Button Actions -->
+    <string name="btn_activate_vpn">Activate %1$s VPN</string>
+    <string name="btn_deactivate_vpn">Disconnect %1$s VPN</string>
+    <string name="btn_open_client_app">Open %1$s</string>
+    <string name="btn_install_client_app">Get %1$s on Google Play</string>
+    <string name="btn_open_internet_panel">Floating Internet Panel</string>
+
+    <!-- Automation & Transition Safeguards -->
+    <string name="section_automation_controls">Automation &amp; Transition Safeguards</string>
+    <string name="toggle_auto_guard_title">Auto-Connect on Untrusted Networks</string>
+    <string name="toggle_auto_guard_subtitle">Passive OS NetworkCallback connects VPN the instant Trusted Wi-Fi drops</string>
+
+    <string name="toggle_preemptive_rssi_title">Pre-Emptive Wi-Fi Disconnect Connect</string>
+    <string name="toggle_preemptive_rssi_subtitle">Connects VPN at weak signal (&lt; -77 dBm) before Wi-Fi drops (0ms 5G gap)</string>
+
+    <string name="toggle_exposure_alert_title">5G Exposure Warning &amp; 1-Tap Panel</string>
+    <string name="toggle_exposure_alert_subtitle">Heads-up alert + floating Internet Panel shortcut if handshake exceeds 4.5s</string>
+
+    <string name="toggle_auto_disconnect_title">Auto-Disconnect on Trusted Wi-Fi</string>
+    <string name="toggle_auto_disconnect_subtitle">Send disconnect when returning to an approved Trusted Network</string>
+
+    <!-- VPN Provider Section -->
+    <string name="section_vpn_provider">VPN Client Provider</string>
+    <string name="provider_tailscale_desc">Official Tailscale app (com.tailscale.ipn)</string>
+    <string name="provider_wireguard_desc">Official WireGuard app (com.wireguard.android)</string>
+    <string name="field_wireguard_tunnel_name">WireGuard Tunnel Profile</string>
+    <string name="wireguard_remote_hint">In WireGuard, verify Settings -> Advanced -> Allow remote control apps is checked.</string>
+    <string name="wireguard_tunnels_header">Configured WireGuard Tunnels</string>
+    <string name="btn_add_wireguard_tunnel">Add Tunnel Profile</string>
+    <string name="btn_open_wireguard_app">Open WireGuard</string>
+    <string name="dialog_add_tunnel_title">Add WireGuard Tunnel Profile</string>
+    <string name="dialog_add_tunnel_hint">Exact tunnel name in WireGuard (e.g. Home Router, ProtonVPN)</string>
+    <string name="dialog_delete_tunnel_title">Delete WireGuard Tunnel</string>
+    <string name="dialog_delete_tunnel_msg">Are you sure you want to delete profile \"%1$s\"? You can re-add it at any time.</string>
+    <string name="btn_confirm_delete">Delete</string>
+    <string name="wireguard_security_notice">Android isolates app databases by design. Save your WireGuard tunnel names here for automatic activation, but you must still upload the .conf file in the WireGuard app directly.</string>
+    <string name="card_wireguard_perm_needed_title">Android Control Permission Required</string>
+    <string name="card_wireguard_perm_needed_desc">WireGuard requires runtime authorization for external apps to activate tunnels. Tap below to grant permission.</string>
+    <string name="btn_grant_wireguard_perm">Grant WireGuard Control Permission</string>
+    <string name="card_wireguard_perm_granted">Remote Control Permission Active</string>
+
+    <string name="hero_status_manual_override_title">%1$s Active (Manual Override)</string>
+    <string name="hero_status_manual_override_subtitle">Trusted Network auto-disconnect paused • Tap to resume auto-guard</string>
+    <string name="hero_status_manual_override_pending_title">Connecting %1$s (Manual Override)</string>
+    <string name="hero_status_manual_override_pending_subtitle">Connecting on Trusted Wi-Fi • Auto-disconnect paused</string>
+
+    <!-- Telemetry & Diagnostics -->
+    <string name="section_live_telemetry">Live Link Telemetry</string>
+    <string name="telemetry_transport">Transport</string>
+    <string name="telemetry_subnet">Subnet CIDR</string>
+    <string name="telemetry_gateway_dns">Gateway / DNS</string>
+    <string name="telemetry_vpn_ip">VPN Tunnel IP</string>
+    <string name="telemetry_wifi_rssi">Wi-Fi Signal Strength</string>
+    <string name="telemetry_ssid">Wi-Fi SSID</string>
+    <string name="telemetry_none">Offline / None</string>
+    <string name="telemetry_redacted_zero_perm">Zero-permission mode (Subnet active)</string>
+
+    <!-- Integration & Diagnostics Helper -->
+    <string name="card_vpn_integration_title">%1$s Integration &amp; Always-On Helper</string>
+    <string name="card_client_installed">%1$s package (%2$s) detected</string>
+    <string name="card_client_missing">%1$s app not detected — install to establish tunnel</string>
+    <string name="btn_system_vpn_settings">System Always-On VPN Settings</string>
+    <string name="btn_test_broadcast">Test Broadcast</string>
+
+    <!-- Trusted Networks Screen -->
+    <string name="trusted_header_title">Trusted Networks</string>
+    <string name="trusted_header_subtitle">Zero-location subnet fingerprinting by default, or opt-in Wi-Fi SSID matching.</string>
+    <string name="btn_trust_current_network">Trust Current Network</string>
+    <string name="btn_add_custom_network">Add Rule</string>
+    <string name="empty_trusted_title">No Trusted Networks Yet</string>
+    <string name="empty_trusted_body">Tap \"Trust Current Network\" while on Home or Office Wi-Fi so TailGuard pauses VPN on safe LANs and auto-connects the instant you leave.</string>
+    <string name="dialog_add_network_title">Configure Trusted Network</string>
+    <string name="field_network_label">Friendly Label (e.g., Home Fiber)</string>
+    <string name="field_subnet_cidr">IPv4 / IPv6 Subnet CIDR</string>
+    <string name="field_gateway_signature">Gateway &amp; DNS Fingerprint</string>
+    <string name="field_wifi_ssid">Wi-Fi SSID (Optional)</string>
+    <string name="match_mode_fingerprint">Subnet + DNS (0 Permissions)</string>
+    <string name="match_mode_ssid">Wi-Fi SSID</string>
+    <string name="match_mode_both">Subnet + SSID</string>
+    <string name="btn_grant_location_for_ssid">Read Current SSID (Location Permission)</string>
+    <string name="btn_save_network">Save Trusted Network</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_delete_network">Delete trusted network</string>
+    <string name="badge_currently_matched">ACTIVE MATCH</string>
+    <string name="label_auto_disconnect_chip">Auto-disconnect VPN on arrival</string>
+
+    <!-- Transition Logs Screen -->
+    <string name="logs_header_title">Connection Transition Log</string>
+    <string name="logs_header_subtitle">Chronological audit trail of network shifts, pre-emptive shields, and VPN broadcast intents.</string>
+    <string name="filter_all">All Events</string>
+    <string name="filter_vpn">VPN Intents</string>
+    <string name="filter_network">Network Shifts</string>
+    <string name="filter_alerts">Alerts &amp; Shields</string>
+    <string name="btn_export_logs">Export Log</string>
+    <string name="btn_clear_logs">Clear</string>
+    <string name="empty_logs_title">No Transitions Recorded Yet</string>
+    <string name="empty_logs_body">Toggle VPN or switch between Wi-Fi and 5G to watch real-time transition telemetry appear here.</string>
+
+    <!-- Tile, Widget & Notifications -->
+    <string name="tile_label">TailGuard VPN</string>
+    <string name="tile_subtitle_on">VPN Protected</string>
+    <string name="tile_subtitle_lockdown">Shield Active</string>
+    <string name="tile_subtitle_trusted">Trusted Wi-Fi</string>
+    <string name="tile_subtitle_off">Tap to Connect</string>
+    <string name="widget_description">1x1 rapid one-tap toggle for VPN connection and transition shield posture</string>
+    <string name="widget_status_on">VPN ON</string>
+    <string name="widget_status_lock">SHIELD</string>
+    <string name="widget_status_safe">TRUSTED</string>
+    <string name="widget_status_off">VPN OFF</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel_monitor_name">TailGuard Passive Network Monitor</string>
+    <string name="notif_channel_monitor_desc">Low-priority status indicator while passive Untrusted Network Auto-Guard is enabled</string>
+    <string name="notif_channel_alert_name">5G Exposure &amp; Handshake Alerts</string>
+    <string name="notif_channel_alert_desc">High-priority alerts if 5G cellular traffic is exposed without an active VPN tunnel</string>
+
+    <string name="notif_monitor_title_protected_fmt">TailGuard • %1$s Active</string>
+    <string name="notif_monitor_title_preemptive_fmt">TailGuard • Pre-Emptive Shield (%1$s)</string>
+    <string name="notif_monitor_title_connecting_fmt">TailGuard • Connecting %1$s...</string>
+    <string name="notif_monitor_title_trusted">TailGuard • Trusted Network</string>
+    <string name="notif_monitor_title_standby">TailGuard • Watching Network Transitions</string>
+    <string name="notif_action_toggle_vpn">Toggle VPN</string>
+
+    <string name="notif_exposure_alert_title">5G Alert — VPN Not Connected</string>
+    <string name="notif_exposure_alert_body">Cellular traffic active without %1$s tunnel. Tap to open Internet Panel.</string>
+    <string name="notif_exposure_alert_body_long">5G cellular data is active without an established %1$s WireGuard tunnel. Tap below to open Android\'s floating Internet Panel to quickly manage cellular or Wi-Fi.</string>
+    <string name="notif_action_open_internet_panel">Internet Panel</string>
+</resources>

@@ -1,0 +1,6 @@
+{
+  "name": "TailGuard",
+  "description": "Lightweight Tailscale VPN automation companion with zero-permission Trusted Network detection, a 5G Kill Switch sinkhole, rapid one-tap toggles, and connection transition logs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
