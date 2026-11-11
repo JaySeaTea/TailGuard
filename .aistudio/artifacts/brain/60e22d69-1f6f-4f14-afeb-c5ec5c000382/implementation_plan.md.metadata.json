@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for Manual Trusted Network VPN Bypass, WireGuard Tunnel Delete Confirmation Dialog, and WireGuard Control Permission & Connection Resolution.",
-  "updatedAt": "2026-11-05T13:21:43.897600175Z",
-  "requestFeedback": true,
-  "userFacing": true
+  "summary":  "Comprehensive UX simplification plan for TailGuard:\n1. Re-architect Dashboard screen using progressive disclosure (compact glance card with expandable granular inspector for Gateway, DNS, Subnet, RSSI).\n2. Consolidate secondary controls (safeguards, RSSI sliders, broadcast testing, system VPN shortcut) into a single Collapsible Advanced Controls section.\n3. Streamline Hero card with embedded live connection summary pills.\n4. Maintain 100% of existing network insight, diagnostic hooks, and automated rules.",
+  "updatedAt":  "2026-11-11T02:40:50.834565240Z",
+  "requestFeedback":  true,
+  "userFacing":  true
 }

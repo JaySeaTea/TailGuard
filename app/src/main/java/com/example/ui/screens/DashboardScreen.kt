@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -29,12 +31,14 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.GppMaybe
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Router
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SignalCellularAlt
@@ -71,11 +75,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -164,20 +170,13 @@ fun DashboardScreen(
         }
 
         item {
-            TransitionSafeguardsCard(
+            AdvancedControlsAndSafeguardsCard(
                 uiState = uiState,
                 onAutoConnectChanged = onAutoConnectChanged,
                 onPreemptiveRssiChanged = onPreemptiveRssiChanged,
                 onExposureAlertChanged = onExposureAlertChanged,
                 onAutoDisconnectChanged = onAutoDisconnectChanged,
-                onOpenInternetPanel = onOpenInternetPanel
-            )
-        }
-
-        item {
-            IntegrationDiagnosticsCard(
-                provider = uiState.settings.activeProvider,
-                isClientInstalled = uiState.isClientInstalled,
+                onOpenInternetPanel = onOpenInternetPanel,
                 onOpenClient = onOpenClient,
                 onOpenSystemVpnSettings = onOpenSystemVpnSettings,
                 onTestBroadcast = onTestBroadcast
@@ -369,6 +368,41 @@ private fun RapidToggleHeroCard(
                     }
                 }
 
+                // Compact Live Telemetry Pill Strip
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val transportText = if (uiState.snapshot.wifiRssiDbm != null) {
+                        "${uiState.snapshot.transportLabel} • ${uiState.snapshot.wifiRssiDbm} dBm"
+                    } else {
+                        uiState.snapshot.transportLabel
+                    }
+                    HeroStatusPill(
+                        icon = when (uiState.snapshot.transportKind) {
+                            TransportKind.WIFI -> Icons.Filled.Wifi
+                            TransportKind.CELLULAR_5G, TransportKind.CELLULAR_LTE -> Icons.Filled.SignalCellularAlt
+                            else -> Icons.Filled.GppMaybe
+                        },
+                        text = transportText,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    val vpnPillText = if (uiState.snapshot.isVpnTunnelActive) {
+                        uiState.snapshot.vpnIp?.let { "$providerName • $it" } ?: "$providerName Active"
+                    } else if (uiState.isHandshakePending) {
+                        "Connecting $providerName..."
+                    } else {
+                        "VPN Inactive"
+                    }
+                    HeroStatusPill(
+                        icon = Icons.Filled.Shield,
+                        text = vpnPillText,
+                        highlight = uiState.snapshot.isVpnTunnelActive,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
                 val isTunnelUpOrPending = uiState.snapshot.isVpnTunnelActive || uiState.isHandshakePending || uiState.isManualOverrideActive
                 Button(
                     onClick = onRapidToggle,
@@ -421,10 +455,14 @@ private fun LiveTelemetryCard(
     onTrustCurrentClick: () -> Unit,
     onRefreshClick: () -> Unit
 ) {
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
+    val chevronRotation by animateFloatAsState(targetValue = if (isExpanded) 180f else 0f, label = "telemetry_chevron")
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("live_telemetry_card"),
+            .testTag("live_telemetry_card")
+            .animateContentSize(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
@@ -434,6 +472,7 @@ private fun LiveTelemetryCard(
                 .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Header Row with Title, Refresh, and Expand toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -456,96 +495,111 @@ private fun LiveTelemetryCard(
                     )
                 }
 
-                IconButton(
-                    onClick = onRefreshClick,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("refresh_telemetry_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Refresh,
-                        contentDescription = "Refresh telemetry",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onRefreshClick,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("refresh_telemetry_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Refresh,
+                            contentDescription = "Refresh telemetry",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { isExpanded = !isExpanded },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("toggle_telemetry_expansion")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.ExpandMore,
+                            contentDescription = if (isExpanded) "Collapse telemetry" else "Expand telemetry",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.rotate(chevronRotation)
+                        )
+                    }
                 }
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            // Compact 2x2 Telemetry Glance Grid
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Cell 1: Link Transport
+                GlanceMetricCell(
+                    label = stringResource(R.string.telemetry_transport),
+                    value = snapshot.transportLabel,
+                    icon = when (snapshot.transportKind) {
+                        TransportKind.WIFI -> Icons.Filled.Wifi
+                        TransportKind.CELLULAR_5G, TransportKind.CELLULAR_LTE -> Icons.Filled.SignalCellularAlt
+                        else -> Icons.Filled.GppMaybe
+                    },
+                    accentColor = when (snapshot.transportKind) {
+                        TransportKind.WIFI -> MaterialTheme.colorScheme.secondary
+                        TransportKind.CELLULAR_5G -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.weight(1f)
+                )
 
-            TelemetryRow(
-                label = stringResource(R.string.telemetry_transport),
-                value = snapshot.transportLabel,
-                icon = when (snapshot.transportKind) {
-                    TransportKind.WIFI -> Icons.Filled.Wifi
-                    TransportKind.CELLULAR_5G,
-                    TransportKind.CELLULAR_LTE -> Icons.Filled.SignalCellularAlt
-                    else -> Icons.Filled.GppMaybe
-                },
-                accentColor = when (snapshot.transportKind) {
-                    TransportKind.WIFI -> MaterialTheme.colorScheme.secondary
-                    TransportKind.CELLULAR_5G -> MaterialTheme.colorScheme.primary
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                }
-            )
-
-            // Wi-Fi Signal RSSI row
-            if (snapshot.transportKind == TransportKind.WIFI && snapshot.wifiRssiDbm != null) {
-                val rssi = snapshot.wifiRssiDbm
-                val rssiColor = when {
-                    rssi >= -65 -> Color(0xFF00E676)
-                    rssi >= -77 -> Color(0xFFFFB74D)
-                    else -> Color(0xFFFF5252)
-                }
-                val rssiQuality = when {
-                    rssi >= -65 -> "Strong"
-                    rssi >= -77 -> "Fair"
-                    else -> "Weak (Shield Arms)"
-                }
-                TelemetryRow(
-                    label = stringResource(R.string.telemetry_wifi_rssi),
-                    value = "$rssi dBm ($rssiQuality)",
-                    icon = Icons.Filled.Wifi,
-                    accentColor = rssiColor
+                // Cell 2: Gateway IP
+                GlanceMetricCell(
+                    label = stringResource(R.string.glance_gateway_label),
+                    value = snapshot.gatewayIp ?: stringResource(R.string.telemetry_none),
+                    icon = Icons.Filled.Router,
+                    modifier = Modifier.weight(1f)
                 )
             }
 
-            TelemetryRow(
-                label = stringResource(R.string.telemetry_subnet),
-                value = snapshot.subnetCidr.ifEmpty { stringResource(R.string.telemetry_none) },
-                icon = Icons.Filled.NetworkCheck
-            )
-
-            val formattedGatewayDns = if (snapshot.gatewayAndDnsSignature.contains(" | ")) {
-                snapshot.gatewayAndDnsSignature.replace(" | ", "\n")
-            } else {
-                snapshot.gatewayAndDnsSignature.ifEmpty { stringResource(R.string.telemetry_none) }
-            }
-            TelemetryRow(
-                label = stringResource(R.string.telemetry_gateway_dns),
-                value = formattedGatewayDns,
-                icon = Icons.Filled.CheckCircle
-            )
-
-            TelemetryRow(
-                label = stringResource(R.string.telemetry_vpn_ip),
-                value = snapshot.vpnIp ?: "Inactive",
-                icon = Icons.Filled.Shield,
-                accentColor = if (snapshot.isVpnTunnelActive) MaterialTheme.colorScheme.primary else null
-            )
-
-            if (snapshot.transportKind == TransportKind.WIFI) {
-                val ssidDisplay = if (hasLocationPermission) {
-                    snapshot.ssid ?: "Hidden / Redacted"
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Cell 3: Signal or Subnet
+                val signalValue = if (snapshot.transportKind == TransportKind.WIFI && snapshot.wifiRssiDbm != null) {
+                    "${snapshot.wifiRssiDbm} dBm"
+                } else if (snapshot.subnetCidr.isNotEmpty()) {
+                    snapshot.subnetCidr
                 } else {
-                    stringResource(R.string.telemetry_redacted_zero_perm)
+                    snapshot.transportLabel
                 }
-                TelemetryRow(
-                    label = stringResource(R.string.telemetry_ssid),
-                    value = ssidDisplay,
-                    icon = Icons.Filled.Wifi
+                val signalColor = if (snapshot.wifiRssiDbm != null) {
+                    val rssi = snapshot.wifiRssiDbm
+                    when {
+                        rssi >= -65 -> Color(0xFF00E676)
+                        rssi >= -77 -> Color(0xFFFFB74D)
+                        else -> Color(0xFFFF5252)
+                    }
+                } else null
+
+                GlanceMetricCell(
+                    label = if (snapshot.transportKind == TransportKind.WIFI && snapshot.wifiRssiDbm != null) {
+                        stringResource(R.string.glance_signal_label)
+                    } else {
+                        stringResource(R.string.glance_subnet_label)
+                    },
+                    value = signalValue,
+                    icon = if (snapshot.transportKind == TransportKind.WIFI) Icons.Filled.Wifi else Icons.Filled.NetworkCheck,
+                    accentColor = signalColor,
+                    modifier = Modifier.weight(1f)
+                )
+
+                // Cell 4: VPN Route
+                GlanceMetricCell(
+                    label = stringResource(R.string.telemetry_vpn_ip),
+                    value = snapshot.vpnIp ?: "Inactive",
+                    icon = Icons.Filled.Shield,
+                    accentColor = if (snapshot.isVpnTunnelActive) MaterialTheme.colorScheme.primary else null,
+                    modifier = Modifier.weight(1f)
                 )
             }
 
+            // Matched Trusted Network badge or Trust CTA
             if (matchedNetworkLabel != null) {
                 Surface(
                     shape = RoundedCornerShape(10.dp),
@@ -588,6 +642,203 @@ private fun LiveTelemetryCard(
                     Text(stringResource(R.string.btn_trust_current_network))
                 }
             }
+
+            // Expand / Collapse Inspector Action Button
+            TextButton(
+                onClick = { isExpanded = !isExpanded },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("btn_inspect_full_telemetry")
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(18.dp)
+                        .rotate(chevronRotation),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isExpanded) {
+                        stringResource(R.string.telemetry_collapse_details)
+                    } else {
+                        stringResource(R.string.telemetry_expand_details)
+                    },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            // Granular Detailed Telemetry (Progressive Disclosure)
+            AnimatedVisibility(visible = isExpanded) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    TelemetryRow(
+                        label = stringResource(R.string.telemetry_transport),
+                        value = snapshot.transportLabel,
+                        icon = when (snapshot.transportKind) {
+                            TransportKind.WIFI -> Icons.Filled.Wifi
+                            TransportKind.CELLULAR_5G,
+                            TransportKind.CELLULAR_LTE -> Icons.Filled.SignalCellularAlt
+                            else -> Icons.Filled.GppMaybe
+                        },
+                        accentColor = when (snapshot.transportKind) {
+                            TransportKind.WIFI -> MaterialTheme.colorScheme.secondary
+                            TransportKind.CELLULAR_5G -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+
+                    if (snapshot.transportKind == TransportKind.WIFI && snapshot.wifiRssiDbm != null) {
+                        val rssi = snapshot.wifiRssiDbm
+                        val rssiColor = when {
+                            rssi >= -65 -> Color(0xFF00E676)
+                            rssi >= -77 -> Color(0xFFFFB74D)
+                            else -> Color(0xFFFF5252)
+                        }
+                        val rssiQuality = when {
+                            rssi >= -65 -> "Strong"
+                            rssi >= -77 -> "Fair"
+                            else -> "Weak (Shield Arms)"
+                        }
+                        TelemetryRow(
+                            label = stringResource(R.string.telemetry_wifi_rssi),
+                            value = "$rssi dBm ($rssiQuality)",
+                            icon = Icons.Filled.Wifi,
+                            accentColor = rssiColor
+                        )
+                    }
+
+                    TelemetryRow(
+                        label = stringResource(R.string.telemetry_subnet),
+                        value = snapshot.subnetCidr.ifEmpty { stringResource(R.string.telemetry_none) },
+                        icon = Icons.Filled.NetworkCheck
+                    )
+
+                    val formattedGatewayDns = if (snapshot.gatewayAndDnsSignature.contains(" | ")) {
+                        snapshot.gatewayAndDnsSignature.replace(" | ", "\n")
+                    } else {
+                        snapshot.gatewayAndDnsSignature.ifEmpty { stringResource(R.string.telemetry_none) }
+                    }
+                    TelemetryRow(
+                        label = stringResource(R.string.telemetry_gateway_dns),
+                        value = formattedGatewayDns,
+                        icon = Icons.Filled.CheckCircle
+                    )
+
+                    TelemetryRow(
+                        label = stringResource(R.string.telemetry_vpn_ip),
+                        value = snapshot.vpnIp ?: "Inactive",
+                        icon = Icons.Filled.Shield,
+                        accentColor = if (snapshot.isVpnTunnelActive) MaterialTheme.colorScheme.primary else null
+                    )
+
+                    if (snapshot.transportKind == TransportKind.WIFI) {
+                        val ssidDisplay = if (hasLocationPermission) {
+                            snapshot.ssid ?: "Hidden / Redacted"
+                        } else {
+                            stringResource(R.string.telemetry_redacted_zero_perm)
+                        }
+                        TelemetryRow(
+                            label = stringResource(R.string.telemetry_ssid),
+                            value = ssidDisplay,
+                            icon = Icons.Filled.Wifi
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlanceMetricCell(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    accentColor: Color? = null,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = accentColor ?: MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = JetBrainsMonoFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    color = accentColor ?: MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroStatusPill(
+    icon: ImageVector,
+    text: String,
+    highlight: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = if (highlight) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+        } else {
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.65f)
+        },
+        border = BorderStroke(
+            1.dp,
+            if (highlight) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+        ),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(13.dp)
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (highlight) FontWeight.Bold else FontWeight.Medium,
+                color = if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1
+            )
         }
     }
 }
@@ -1108,107 +1359,33 @@ private fun VpnProviderSelectionCard(
 }
 
 @Composable
-private fun TransitionSafeguardsCard(
+private fun AdvancedControlsAndSafeguardsCard(
     uiState: DashboardUiState,
     onAutoConnectChanged: (Boolean) -> Unit,
     onPreemptiveRssiChanged: (Boolean) -> Unit,
     onExposureAlertChanged: (Boolean) -> Unit,
     onAutoDisconnectChanged: (Boolean) -> Unit,
-    onOpenInternetPanel: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("transition_safeguards_card"),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Security,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-                Text(
-                    text = stringResource(R.string.section_automation_controls),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            SettingToggleRow(
-                title = stringResource(R.string.toggle_auto_guard_title),
-                subtitle = stringResource(R.string.toggle_auto_guard_subtitle),
-                checked = uiState.settings.autoConnectEnabled,
-                onCheckedChange = onAutoConnectChanged,
-                testTag = "auto_connect_switch"
-            )
-
-            SettingToggleRow(
-                title = stringResource(R.string.toggle_preemptive_rssi_title),
-                subtitle = stringResource(R.string.toggle_preemptive_rssi_subtitle),
-                checked = uiState.settings.preemptiveRssiEnabled,
-                onCheckedChange = onPreemptiveRssiChanged,
-                testTag = "preemptive_rssi_switch"
-            )
-
-            SettingToggleRow(
-                title = stringResource(R.string.toggle_exposure_alert_title),
-                subtitle = stringResource(R.string.toggle_exposure_alert_subtitle),
-                checked = uiState.settings.exposureAlertEnabled,
-                onCheckedChange = onExposureAlertChanged,
-                testTag = "exposure_alert_switch"
-            )
-
-            SettingToggleRow(
-                title = stringResource(R.string.toggle_auto_disconnect_title),
-                subtitle = stringResource(R.string.toggle_auto_disconnect_subtitle),
-                checked = uiState.settings.autoDisconnectOnTrusted,
-                onCheckedChange = onAutoDisconnectChanged,
-                testTag = "auto_disconnect_switch"
-            )
-
-            OutlinedButton(
-                onClick = onOpenInternetPanel,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("open_internet_panel_button"),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.btn_open_internet_panel))
-            }
-        }
-    }
-}
-
-@Composable
-private fun IntegrationDiagnosticsCard(
-    provider: VpnProvider,
-    isClientInstalled: Boolean,
+    onOpenInternetPanel: () -> Unit,
     onOpenClient: () -> Unit,
     onOpenSystemVpnSettings: () -> Unit,
     onTestBroadcast: () -> Unit
 ) {
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
+    val chevronRotation by animateFloatAsState(targetValue = if (isExpanded) 180f else 0f, label = "advanced_chevron")
+    val provider = uiState.settings.activeProvider
+
+    val activeCount = listOf(
+        uiState.settings.autoConnectEnabled,
+        uiState.settings.preemptiveRssiEnabled,
+        uiState.settings.exposureAlertEnabled,
+        uiState.settings.autoDisconnectOnTrusted
+    ).count { it }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("integration_diagnostics_card"),
+            .testTag("transition_safeguards_card")
+            .animateContentSize(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
@@ -1218,112 +1395,228 @@ private fun IntegrationDiagnosticsCard(
                 .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // Header Row: clickable to expand/collapse
             Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Settings,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-                Text(
-                    text = stringResource(R.string.card_vpn_integration_title, provider.displayName),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = if (isClientInstalled) {
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant
-                },
-                modifier = Modifier.fillMaxWidth()
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(
-                        imageVector = if (isClientInstalled) Icons.Filled.CheckCircle else Icons.Filled.GppMaybe,
-                        contentDescription = null,
-                        tint = if (isClientInstalled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = if (isClientInstalled) {
-                            stringResource(R.string.card_client_installed, provider.displayName, provider.packageName)
-                        } else {
-                            stringResource(R.string.card_client_missing, provider.displayName)
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedButton(
-                    onClick = onTestBroadcast,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("test_broadcast_button"),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Send,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(stringResource(R.string.btn_test_broadcast))
-                }
-
-                FilledTonalButton(
-                    onClick = onOpenClient,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("open_client_button"),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        if (isClientInstalled) {
-                            stringResource(R.string.btn_open_client_app, provider.displayName)
-                        } else {
-                            stringResource(R.string.btn_install_client_app, provider.displayName)
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Outlined.Settings,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
+                    }
+
+                    Column {
+                        Text(
+                            text = stringResource(R.string.section_advanced_controls),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(
+                                R.string.subtitle_advanced_controls_fmt,
+                                activeCount,
+                                provider.displayName
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = { isExpanded = !isExpanded },
+                    modifier = Modifier.testTag("toggle_advanced_controls")
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ExpandMore,
+                        contentDescription = if (isExpanded) "Collapse advanced controls" else "Expand advanced controls",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.rotate(chevronRotation)
                     )
                 }
             }
 
-            OutlinedButton(
-                onClick = onOpenSystemVpnSettings,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("system_vpn_settings_button"),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Settings,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.btn_system_vpn_settings))
+            AnimatedVisibility(visible = isExpanded) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    Text(
+                        text = stringResource(R.string.section_automation_controls),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    SettingToggleRow(
+                        title = stringResource(R.string.toggle_auto_guard_title),
+                        subtitle = stringResource(R.string.toggle_auto_guard_subtitle),
+                        checked = uiState.settings.autoConnectEnabled,
+                        onCheckedChange = onAutoConnectChanged,
+                        testTag = "auto_connect_switch"
+                    )
+
+                    SettingToggleRow(
+                        title = stringResource(R.string.toggle_preemptive_rssi_title),
+                        subtitle = stringResource(R.string.toggle_preemptive_rssi_subtitle),
+                        checked = uiState.settings.preemptiveRssiEnabled,
+                        onCheckedChange = onPreemptiveRssiChanged,
+                        testTag = "preemptive_rssi_switch"
+                    )
+
+                    SettingToggleRow(
+                        title = stringResource(R.string.toggle_exposure_alert_title),
+                        subtitle = stringResource(R.string.toggle_exposure_alert_subtitle),
+                        checked = uiState.settings.exposureAlertEnabled,
+                        onCheckedChange = onExposureAlertChanged,
+                        testTag = "exposure_alert_switch"
+                    )
+
+                    SettingToggleRow(
+                        title = stringResource(R.string.toggle_auto_disconnect_title),
+                        subtitle = stringResource(R.string.toggle_auto_disconnect_subtitle),
+                        checked = uiState.settings.autoDisconnectOnTrusted,
+                        onCheckedChange = onAutoDisconnectChanged,
+                        testTag = "auto_disconnect_switch"
+                    )
+
+                    OutlinedButton(
+                        onClick = onOpenInternetPanel,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("open_internet_panel_button"),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.btn_open_internet_panel))
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    Text(
+                        text = stringResource(R.string.card_vpn_integration_title, provider.displayName),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (uiState.isClientInstalled) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.isClientInstalled) Icons.Filled.CheckCircle else Icons.Filled.GppMaybe,
+                                contentDescription = null,
+                                tint = if (uiState.isClientInstalled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = if (uiState.isClientInstalled) {
+                                    stringResource(R.string.card_client_installed, provider.displayName, provider.packageName)
+                                } else {
+                                    stringResource(R.string.card_client_missing, provider.displayName)
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onTestBroadcast,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("test_broadcast_button"),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Send,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(stringResource(R.string.btn_test_broadcast))
+                        }
+
+                        FilledTonalButton(
+                            onClick = onOpenClient,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("open_client_button"),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                if (uiState.isClientInstalled) {
+                                    stringResource(R.string.btn_open_client_app, provider.displayName)
+                                } else {
+                                    stringResource(R.string.btn_install_client_app, provider.displayName)
+                                }
+                            )
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = onOpenSystemVpnSettings,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("system_vpn_settings_button"),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Settings,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.btn_system_vpn_settings))
+                    }
+                }
             }
         }
     }

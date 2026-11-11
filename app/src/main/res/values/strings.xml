@@ -73,6 +73,11 @@
 
     <!-- Telemetry & Diagnostics -->
     <string name="section_live_telemetry">Live Link Telemetry</string>
+    <string name="telemetry_expand_details">Inspect Full Telemetry</string>
+    <string name="telemetry_collapse_details">Hide Granular Telemetry</string>
+    <string name="glance_gateway_label">Gateway</string>
+    <string name="glance_subnet_label">Subnet</string>
+    <string name="glance_signal_label">Signal</string>
     <string name="telemetry_transport">Transport</string>
     <string name="telemetry_subnet">Subnet CIDR</string>
     <string name="telemetry_gateway_dns">Gateway / DNS</string>
@@ -81,6 +86,10 @@
     <string name="telemetry_ssid">Wi-Fi SSID</string>
     <string name="telemetry_none">Offline / None</string>
     <string name="telemetry_redacted_zero_perm">Zero-permission mode (Subnet active)</string>
+
+    <!-- Collapsible Advanced Safeguards & Controls -->
+    <string name="section_advanced_controls">Advanced Safeguards &amp; Controls</string>
+    <string name="subtitle_advanced_controls_fmt">%1$d active safeguards • %2$s ready</string>
 
     <!-- Integration & Diagnostics Helper -->
     <string name="card_vpn_integration_title">%1$s Integration &amp; Always-On Helper</string>
