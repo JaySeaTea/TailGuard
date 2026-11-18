@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.History
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.VpnLock
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -359,6 +361,10 @@ private fun eventStyle(
             Triple(Icons.Filled.VpnLock, Color(0xFF00E5FF), "PRE-EMPTIVE SHIELD")
         TransitionEventType.EXPOSURE_ALERT_POSTED ->
             Triple(Icons.Filled.NotificationsActive, Color(0xFFFFB74D), "5G EXPOSURE ALERT")
+        TransitionEventType.UNSTABLE_NETWORK_LATCHED ->
+            Triple(Icons.Filled.Warning, Color(0xFFFFB74D), "UNSTABLE LATCH")
+        TransitionEventType.UNSTABLE_LATCH_RELEASED ->
+            Triple(Icons.Filled.CheckCircle, secondary, "LATCH CLEARED")
         TransitionEventType.VPN_CONNECT_SENT,
         TransitionEventType.VPN_DISCONNECT_SENT,
         TransitionEventType.TAILSCALE_CONNECT_SENT,

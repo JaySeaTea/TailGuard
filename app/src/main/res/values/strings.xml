@@ -161,4 +161,20 @@
     <string name="notif_exposure_alert_body">Cellular traffic active without %1$s tunnel. Tap to open Internet Panel.</string>
     <string name="notif_exposure_alert_body_long">5G cellular data is active without an established %1$s WireGuard tunnel. Tap below to open Android\'s floating Internet Panel to quickly manage cellular or Wi-Fi.</string>
     <string name="notif_action_open_internet_panel">Internet Panel</string>
+
+    <!-- Unstable Network Cycling Latch -->
+    <string name="posture_unstable_latched">Unstable Network Latched</string>
+    <string name="posture_unstable_latched_desc">%1$s locked ON after rapid connection cycling</string>
+    <string name="latch_card_title">Connection Cycling Detected</string>
+    <string name="latch_card_body_fmt">%1$d rapid network cycles in 10s detected. %2$s is latched ON to protect traffic and stop broadcast oscillation.</string>
+    <string name="btn_resume_auto_guard">Resume Auto-Guard</string>
+    <string name="tile_subtitle_latched">Latched ON</string>
+    <string name="widget_status_latched">LATCHED</string>
+    <string name="notif_channel_unstable_name">Unstable Network Cycling Alerts</string>
+    <string name="notif_channel_unstable_desc">High-priority alert when TailGuard latches VPN ON due to rapid Wi-Fi / 5G cycling</string>
+    <string name="notif_monitor_title_latched_fmt">TailGuard • Unstable Network Latched (%1$s)</string>
+    <string name="notif_unstable_alert_title">Unstable Network — %1$s Latched ON</string>
+    <string name="notif_unstable_alert_body">5 rapid cycles in 10s on %1$s. Tap Resume Auto-Guard once stable.</string>
+    <string name="notif_unstable_alert_body_long">TailGuard detected 5 connection cycles in 10 seconds (%1$s) and latched %2$s ON to prevent VPN oscillation. Switch networks or tap Resume Auto-Guard once your connection stabilizes.</string>
+    <string name="notif_action_resume_guard">Resume Auto-Guard</string>
 </resources>

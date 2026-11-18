@@ -87,6 +87,11 @@ class TailGuardAppWidgetProvider : AppWidgetProvider() {
                     Color.parseColor("#38BDF8"),
                     R.drawable.ic_tailguard_mesh
                 )
+                VpnPosture.UNSTABLE_LATCHED -> Triple(
+                    context.getString(R.string.widget_status_latched),
+                    Color.parseColor("#FFB74D"),
+                    R.drawable.ic_shield_lockdown
+                )
                 VpnPosture.PREEMPTIVE_SHIELD,
                 VpnPosture.KILL_SWITCH_LOCKDOWN -> Triple(
                     context.getString(R.string.widget_status_lock),

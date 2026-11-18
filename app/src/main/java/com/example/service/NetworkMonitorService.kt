@@ -83,6 +83,11 @@ class NetworkMonitorService : Service() {
                     controller.rapidToggleVpn(sourceLabel = "Status Notification")
                 }
             }
+            ACTION_RESUME_FROM_LATCH -> {
+                serviceScope.launch {
+                    controller.releaseUnstableLatch(sourceLabel = "Notification")
+                }
+            }
             else -> {
                 promoteToLowPriorityForeground(controller.state.value)
                 controller.refreshLiveState(triggerAutomation = true)
@@ -138,12 +143,15 @@ class NetworkMonitorService : Service() {
     companion object {
         const val CHANNEL_ID = "tailguard_passive_monitor"
         const val ALERT_CHANNEL_ID = "tailguard_exposure_alert"
+        const val UNSTABLE_CHANNEL_ID = "tailguard_unstable_alert"
         const val NOTIFICATION_ID = 4102
         const val ALERT_NOTIFICATION_ID = 4103
+        const val UNSTABLE_ALERT_NOTIFICATION_ID = 4104
 
         const val ACTION_START_MONITOR = "com.example.action.START_PASSIVE_MONITOR"
         const val ACTION_STOP_MONITOR = "com.example.action.STOP_PASSIVE_MONITOR"
         const val ACTION_NOTIFICATION_TOGGLE_VPN = "com.example.action.NOTIF_TOGGLE_VPN"
+        const val ACTION_RESUME_FROM_LATCH = "com.example.action.RESUME_FROM_LATCH"
 
         @Volatile
         var isRunning: Boolean = false
@@ -232,6 +240,83 @@ class NetworkMonitorService : Service() {
             runCatching { nm.cancel(ALERT_NOTIFICATION_ID) }
         }
 
+        fun postUnstableNetworkAlert(context: Context, provider: VpnProvider, networkSummary: String) {
+            ensureNotificationChannels(context)
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+
+            val openAppIntent = PendingIntent.getActivity(
+                context,
+                301,
+                Intent(context, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val resumePendingIntent = PendingIntent.getService(
+                context,
+                302,
+                Intent(context, NetworkMonitorService::class.java).apply {
+                    action = ACTION_RESUME_FROM_LATCH
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val panelIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY)
+            } else {
+                Intent(Settings.ACTION_WIRELESS_SETTINGS)
+            }.apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            val pendingPanel = PendingIntent.getActivity(
+                context,
+                303,
+                panelIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val safeNetworkLabel = networkSummary.ifBlank { "Active Network" }
+
+            val unstableNotif = NotificationCompat.Builder(context, UNSTABLE_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_shield_lockdown)
+                .setContentTitle(context.getString(R.string.notif_unstable_alert_title, provider.displayName))
+                .setContentText(context.getString(R.string.notif_unstable_alert_body, safeNetworkLabel))
+                .setStyle(
+                    NotificationCompat.BigTextStyle().bigText(
+                        context.getString(
+                            R.string.notif_unstable_alert_body_long,
+                            safeNetworkLabel,
+                            provider.displayName
+                        )
+                    )
+                )
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setAutoCancel(false)
+                .setContentIntent(openAppIntent)
+                .addAction(
+                    R.drawable.ic_tailguard_mesh,
+                    context.getString(R.string.notif_action_resume_guard),
+                    resumePendingIntent
+                )
+                .addAction(
+                    R.drawable.ic_tailguard_mesh,
+                    context.getString(R.string.notif_action_open_internet_panel),
+                    pendingPanel
+                )
+                .build()
+
+            runCatching {
+                nm.notify(UNSTABLE_ALERT_NOTIFICATION_ID, unstableNotif)
+            }
+        }
+
+        fun cancelUnstableNetworkAlert(context: Context) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+            runCatching { nm.cancel(UNSTABLE_ALERT_NOTIFICATION_ID) }
+        }
+
         private fun ensureNotificationChannels(context: Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
@@ -255,8 +340,19 @@ class NetworkMonitorService : Service() {
                     setShowBadge(true)
                 }
 
+                val unstableChannel = NotificationChannel(
+                    UNSTABLE_CHANNEL_ID,
+                    context.getString(R.string.notif_channel_unstable_name),
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = context.getString(R.string.notif_channel_unstable_desc)
+                    enableVibration(true)
+                    setShowBadge(true)
+                }
+
                 nm.createNotificationChannel(monitorChannel)
                 nm.createNotificationChannel(alertChannel)
+                nm.createNotificationChannel(unstableChannel)
             }
         }
 
@@ -282,6 +378,7 @@ class NetworkMonitorService : Service() {
             val providerName = state.activeProvider.displayName
 
             val title = when (state.posture) {
+                VpnPosture.UNSTABLE_LATCHED -> context.getString(R.string.notif_monitor_title_latched_fmt, providerName)
                 VpnPosture.VPN_ACTIVE,
                 VpnPosture.TAILSCALE_ACTIVE -> context.getString(R.string.notif_monitor_title_protected_fmt, providerName)
                 VpnPosture.PREEMPTIVE_SHIELD -> context.getString(R.string.notif_monitor_title_preemptive_fmt, providerName)

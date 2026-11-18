@@ -220,4 +220,64 @@ class ExampleUnitTest {
         assertTrue(settings.savedWireguardTunnels.contains("ProtonVPN"))
         assertTrue(settings.savedWireguardTunnels.contains("wg0"))
     }
+
+    @Test
+    fun `connection flap detector latches on 5 cycles within 10 seconds and ignores slower transitions`() {
+        val detector = com.example.service.ConnectionFlapDetector(maxCycles = 5, windowMs = 10_000L)
+
+        // Simulate 5 ~1.5s connect/disconnect cycles (~7.5s total) matching real TailGuard log cadence
+        var t = 1_000L
+        for (cycle in 1..4) {
+            org.junit.Assert.assertFalse("Connect cycle $cycle should not latch early", detector.recordAction(com.example.service.ConnectionFlapDetector.FlapAction.CONNECT, t))
+            t += 900L
+            org.junit.Assert.assertFalse("Disconnect cycle $cycle should not latch early", detector.recordAction(com.example.service.ConnectionFlapDetector.FlapAction.DISCONNECT, t))
+            t += 600L
+        }
+
+        // Cycle 5 Connect at +6.0s, Disconnect at +6.9s triggers latch!
+        org.junit.Assert.assertFalse(detector.recordAction(com.example.service.ConnectionFlapDetector.FlapAction.CONNECT, t))
+        t += 900L
+        assertTrue(
+            "5th cycle within 10s must trigger unstable network latch",
+            detector.recordAction(com.example.service.ConnectionFlapDetector.FlapAction.DISCONNECT, t)
+        )
+        assertEquals(5, detector.currentCycles(t))
+
+        // After reset, slow cycles spaced 3s apart (>10s window across 5 cycles) should NOT latch
+        detector.reset()
+        var slowT = 100_000L
+        for (cycle in 1..6) {
+            org.junit.Assert.assertFalse(detector.recordAction(com.example.service.ConnectionFlapDetector.FlapAction.CONNECT, slowT))
+            slowT += 1_500L
+            org.junit.Assert.assertFalse(
+                "Slow transitions exceeding 10s rolling window must not latch (cycle $cycle)",
+                detector.recordAction(com.example.service.ConnectionFlapDetector.FlapAction.DISCONNECT, slowT)
+            )
+            slowT += 1_500L
+        }
+    }
+
+    @Test
+    fun `unstable latch posture takes precedence and latch events appear in Alerts filter`() {
+        val snap = ActiveNetworkSnapshot(
+            transportKind = TransportKind.WIFI,
+            isVpnTunnelActive = true,
+            vpnIp = "100.84.204.99"
+        )
+        assertEquals(
+            VpnPosture.UNSTABLE_LATCHED,
+            VpnAutomationController.computePosture(
+                snap = snap,
+                matched = null,
+                isHandshakePending = false,
+                isUnstableLatched = true
+            )
+        )
+
+        val latchLogs = listOf(
+            TransitionLogEntity(1, 100L, TransitionEventType.UNSTABLE_NETWORK_LATCHED, "Wi-Fi", "Latched ON"),
+            TransitionLogEntity(2, 200L, TransitionEventType.UNSTABLE_LATCH_RELEASED, "Wi-Fi", "Resumed")
+        )
+        assertEquals(2, MainViewModel.filterLogs(latchLogs, LogFilter.ALERTS).size)
+    }
 }

@@ -46,6 +46,8 @@ data class DashboardUiState(
     val isHandshakePending: Boolean = false,
     val isPreemptiveTriggerActive: Boolean = false,
     val isManualOverrideActive: Boolean = false,
+    val isUnstableNetworkLatched: Boolean = false,
+    val unstableLatchSummary: String? = null,
     val activeProvider: VpnProvider = VpnProvider.TAILSCALE,
     val isClientInstalled: Boolean = false,
     val hasWireGuardPermission: Boolean = true,
@@ -90,6 +92,8 @@ class MainViewModel(
             isHandshakePending = orch.isHandshakePending,
             isPreemptiveTriggerActive = orch.isPreemptiveTriggerActive,
             isManualOverrideActive = orch.isManualOverrideActive,
+            isUnstableNetworkLatched = orch.isUnstableNetworkLatched,
+            unstableLatchSummary = orch.unstableLatchSummary,
             activeProvider = settings.activeProvider,
             isClientInstalled = clientInstalled,
             hasWireGuardPermission = orch.hasWireGuardPermission,
@@ -122,6 +126,12 @@ class MainViewModel(
     fun onRapidToggleClicked() {
         viewModelScope.launch {
             controller.rapidToggleVpn(sourceLabel = "Dashboard Hero")
+        }
+    }
+
+    fun releaseUnstableLatch() {
+        viewModelScope.launch {
+            controller.releaseUnstableLatch(sourceLabel = "Dashboard")
         }
     }
 
@@ -194,6 +204,7 @@ class MainViewModel(
                 controller.evaluateRulesNow()
                 postBanner("Passive Auto-Guard enabled")
             } else {
+                controller.clearUnstableLatchOnPause()
                 NetworkMonitorService.stopPassiveMonitor(appContext)
                 postBanner("Auto-Guard paused")
             }
@@ -338,6 +349,8 @@ class MainViewModel(
                 LogFilter.ALERTS -> logs.filter {
                     it.eventType == TransitionEventType.PREEMPTIVE_CONNECT_TRIGGERED ||
                         it.eventType == TransitionEventType.EXPOSURE_ALERT_POSTED ||
+                        it.eventType == TransitionEventType.UNSTABLE_NETWORK_LATCHED ||
+                        it.eventType == TransitionEventType.UNSTABLE_LATCH_RELEASED ||
                         it.eventType == TransitionEventType.KILL_SWITCH_ENGAGED ||
                         it.eventType == TransitionEventType.KILL_SWITCH_RELEASED
                 }

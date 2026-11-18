@@ -70,6 +70,13 @@ class TailGuardTileService : TileService() {
                     tile.subtitle = getString(R.string.tile_subtitle_on)
                 }
             }
+            VpnPosture.UNSTABLE_LATCHED -> {
+                tile.state = Tile.STATE_ACTIVE
+                tile.icon = Icon.createWithResource(this, R.drawable.ic_shield_lockdown)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    tile.subtitle = getString(R.string.tile_subtitle_latched)
+                }
+            }
             VpnPosture.PREEMPTIVE_SHIELD,
             VpnPosture.KILL_SWITCH_LOCKDOWN -> {
                 tile.state = Tile.STATE_ACTIVE

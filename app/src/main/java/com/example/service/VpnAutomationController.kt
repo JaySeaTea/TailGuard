@@ -33,11 +33,71 @@ data class OrchestratorState(
     val isHandshakePending: Boolean = false,
     val isPreemptiveTriggerActive: Boolean = false,
     val isManualOverrideActive: Boolean = false,
+    val isUnstableNetworkLatched: Boolean = false,
+    val unstableLatchSummary: String? = null,
     val hasWireGuardPermission: Boolean = true,
     val lastActionBanner: String? = null
 ) {
     val isTailscaleInstalled: Boolean
         get() = isClientInstalled
+}
+
+/**
+ * Sliding-window oscillation detector that catches rapid connect/disconnect cycling
+ * (default: 5 full connection cycles within 10 seconds) and triggers an Auto-Guard latch.
+ */
+class ConnectionFlapDetector(
+    private val maxCycles: Int = VpnAutomationController.FLAP_MAX_CYCLES,
+    private val windowMs: Long = VpnAutomationController.FLAP_WINDOW_MS
+) {
+    enum class FlapAction {
+        CONNECT,
+        DISCONNECT
+    }
+
+    private val alternatingActionTimestamps = ArrayDeque<Long>()
+    private val connectTimestamps = ArrayDeque<Long>()
+    private var lastAction: FlapAction? = null
+
+    @Synchronized
+    fun recordAction(action: FlapAction, nowMs: Long = System.currentTimeMillis()): Boolean {
+        prune(nowMs)
+
+        if (alternatingActionTimestamps.isEmpty() || lastAction != action) {
+            alternatingActionTimestamps.addLast(nowMs)
+            lastAction = action
+        }
+
+        if (action == FlapAction.CONNECT) {
+            connectTimestamps.addLast(nowMs)
+        }
+
+        val completedAlternatingCycles = alternatingActionTimestamps.size / 2
+        return completedAlternatingCycles >= maxCycles || connectTimestamps.size >= (maxCycles + 1)
+    }
+
+    @Synchronized
+    fun currentCycles(nowMs: Long = System.currentTimeMillis()): Int {
+        prune(nowMs)
+        return alternatingActionTimestamps.size / 2
+    }
+
+    @Synchronized
+    fun reset() {
+        alternatingActionTimestamps.clear()
+        connectTimestamps.clear()
+        lastAction = null
+    }
+
+    private fun prune(nowMs: Long) {
+        val cutoff = nowMs - windowMs
+        while (alternatingActionTimestamps.isNotEmpty() && alternatingActionTimestamps.first() < cutoff) {
+            alternatingActionTimestamps.removeFirst()
+        }
+        while (connectTimestamps.isNotEmpty() && connectTimestamps.first() < cutoff) {
+            connectTimestamps.removeFirst()
+        }
+    }
 }
 
 class VpnAutomationController(
@@ -49,6 +109,7 @@ class VpnAutomationController(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val evaluationMutex = Mutex()
+    private val flapDetector = ConnectionFlapDetector()
 
     private var handoffWorkflowJob: Job? = null
     private var debounceEvaluationJob: Job? = null
@@ -62,6 +123,12 @@ class VpnAutomationController(
 
     @Volatile
     private var isManualOverrideActive: Boolean = false
+
+    @Volatile
+    private var isUnstableNetworkLatched: Boolean = false
+
+    @Volatile
+    private var unstableLatchSummary: String? = null
 
     private var lastEvaluatedPolicyKey: String? = null
     private var wasPreviouslyUntrusted: Boolean = false
@@ -106,9 +173,56 @@ class VpnAutomationController(
         }
     }
 
+    suspend fun releaseUnstableLatch(sourceLabel: String = "Dashboard") {
+        debounceEvaluationJob?.cancel()
+        var clearedDesc = "Active Network"
+        var hadLatch = false
+        evaluationMutex.withLock {
+            hadLatch = isUnstableNetworkLatched
+            isUnstableNetworkLatched = false
+            unstableLatchSummary = null
+            flapDetector.reset()
+            manualBypassActive = false
+            NetworkMonitorService.cancelUnstableNetworkAlert(appContext)
+            val snap = inspector.captureSnapshot()
+            val matched = TailGuardRepository.findMatchingTrustedNetwork(
+                snap,
+                repository.getEnabledTrustedNetworks()
+            )
+            clearedDesc = describeNetwork(snap, matched)
+            if (hadLatch) {
+                repository.recordTransition(
+                    eventType = TransitionEventType.UNSTABLE_LATCH_RELEASED,
+                    networkSummary = clearedDesc,
+                    vpnActionSummary = "Resumed Auto-Guard ($sourceLabel) — cleared unstable network latch"
+                )
+            }
+        }
+        evaluateInternal(triggerAutomation = true, forceEvaluate = true)
+        if (hadLatch) {
+            publishCurrentState(banner = "Unstable network latch cleared — Auto-Guard resumed")
+        }
+    }
+
+    fun clearUnstableLatchOnPause() {
+        isUnstableNetworkLatched = false
+        unstableLatchSummary = null
+        flapDetector.reset()
+        NetworkMonitorService.cancelUnstableNetworkAlert(appContext)
+        scope.launch {
+            publishCurrentState(banner = null)
+        }
+    }
+
     suspend fun rapidToggleVpn(sourceLabel: String = "Dashboard") {
         debounceEvaluationJob?.cancel()
         cancelHandoffWorkflowSafely()
+        if (isUnstableNetworkLatched) {
+            isUnstableNetworkLatched = false
+            unstableLatchSummary = null
+            flapDetector.reset()
+            NetworkMonitorService.cancelUnstableNetworkAlert(appContext)
+        }
 
         val settings = repository.getSettingsSnapshot()
         val current = _state.value
@@ -285,7 +399,7 @@ class VpnAutomationController(
             }
 
             // Check Pre-Emptive Wi-Fi RSSI Trigger (when connected to a Trusted Wi-Fi Network)
-            if (matched != null && snap.transportKind == TransportKind.WIFI) {
+            if (!isUnstableNetworkLatched && matched != null && snap.transportKind == TransportKind.WIFI) {
                 checkPreemptiveRssiTrigger(snap, matched, settings)
             } else {
                 preemptiveDebounceJob?.cancel()
@@ -293,7 +407,7 @@ class VpnAutomationController(
 
             val workflowRunning = handoffWorkflowJob?.isActive == true
 
-            if (triggerAutomation && settings.autoConnectEnabled) {
+            if (triggerAutomation && settings.autoConnectEnabled && !isUnstableNetworkLatched) {
                 val cooldownElapsed = (System.currentTimeMillis() - lastAutoBroadcastEpochMs) > 8_000L
 
                 val isWeakWifiShielding = isPreemptiveActiveFlag ||
@@ -332,7 +446,8 @@ class VpnAutomationController(
                 matched = matched,
                 isHandshakePending = pendingNow,
                 isPreemptiveActive = isPreemptiveActiveFlag,
-                isManualOverride = isManualOverrideActive
+                isManualOverride = isManualOverrideActive,
+                isUnstableLatched = isUnstableNetworkLatched
             )
             _state.value = OrchestratorState(
                 snapshot = latestSnap,
@@ -343,6 +458,8 @@ class VpnAutomationController(
                 isHandshakePending = pendingNow,
                 isPreemptiveTriggerActive = isPreemptiveActiveFlag,
                 isManualOverrideActive = isManualOverrideActive,
+                isUnstableNetworkLatched = isUnstableNetworkLatched,
+                unstableLatchSummary = unstableLatchSummary,
                 hasWireGuardPermission = wireguardBridge.hasControlPermission(),
                 lastActionBanner = _state.value.lastActionBanner
             )
@@ -355,7 +472,7 @@ class VpnAutomationController(
         matched: TrustedNetworkEntity,
         settings: AutomationSettings
     ) {
-        if (!settings.preemptiveRssiEnabled) {
+        if (!settings.preemptiveRssiEnabled || isUnstableNetworkLatched) {
             preemptiveDebounceJob?.cancel()
             isPreemptiveActiveFlag = false
             return
@@ -445,6 +562,16 @@ class VpnAutomationController(
             wasPreviouslyUntrusted = false
 
             if (shouldSendDisconnect) {
+                val thresholdReached = flapDetector.recordAction(ConnectionFlapDetector.FlapAction.DISCONNECT)
+                if (thresholdReached) {
+                    engageUnstableLatch(
+                        snap = snap,
+                        settings = settings,
+                        netDesc = netDesc,
+                        ensureVpnConnectBroadcast = !snap.isVpnTunnelActive
+                    )
+                    return
+                }
                 lastAutoBroadcastEpochMs = System.currentTimeMillis()
                 sendProviderDisconnect(settings.activeProvider, settings.wireguardTunnelName)
                 repository.recordTransition(
@@ -479,11 +606,60 @@ class VpnAutomationController(
         }
 
         lastAutoBroadcastEpochMs = System.currentTimeMillis()
+        val thresholdReached = flapDetector.recordAction(ConnectionFlapDetector.FlapAction.CONNECT)
+        if (thresholdReached) {
+            engageUnstableLatch(
+                snap = snap,
+                settings = settings,
+                netDesc = netDesc,
+                ensureVpnConnectBroadcast = true
+            )
+            return
+        }
+
         launchUntrustedHandoffWorkflow(
             provider = settings.activeProvider,
             tunnelName = settings.wireguardTunnelName,
             initialBanner = null
         )
+    }
+
+    private suspend fun engageUnstableLatch(
+        snap: ActiveNetworkSnapshot,
+        settings: AutomationSettings,
+        netDesc: String,
+        ensureVpnConnectBroadcast: Boolean
+    ) {
+        isUnstableNetworkLatched = true
+        unstableLatchSummary = netDesc
+        isHandshakePendingFlag = false
+        isPreemptiveActiveFlag = false
+        isManualOverrideActive = false
+        preemptiveDebounceJob?.cancel()
+        cancelHandoffWorkflowSafely()
+        NetworkMonitorService.cancelExposureAlert(appContext)
+
+        if (ensureVpnConnectBroadcast && !snap.isVpnTunnelActive) {
+            sendProviderConnect(settings.activeProvider, settings.wireguardTunnelName)
+        }
+
+        repository.recordTransition(
+            eventType = TransitionEventType.UNSTABLE_NETWORK_LATCHED,
+            networkSummary = netDesc,
+            vpnActionSummary = "Detected $FLAP_MAX_CYCLES connection cycles in 10s — latched ${settings.activeProvider.displayName} ON to stop oscillation"
+        )
+        NetworkMonitorService.postUnstableNetworkAlert(
+            context = appContext,
+            provider = settings.activeProvider,
+            networkSummary = netDesc
+        )
+        _state.value = _state.value.copy(
+            isUnstableNetworkLatched = true,
+            unstableLatchSummary = netDesc,
+            posture = VpnPosture.UNSTABLE_LATCHED,
+            lastActionBanner = "Unstable network ($FLAP_MAX_CYCLES cycles / 10s) — ${settings.activeProvider.displayName} latched ON"
+        )
+        syncExternalSurfaces()
     }
 
     /**
@@ -604,7 +780,8 @@ class VpnAutomationController(
             matched = matched,
             isHandshakePending = pendingNow,
             isPreemptiveActive = isPreemptiveActiveFlag,
-            isManualOverride = isManualOverrideActive
+            isManualOverride = isManualOverrideActive,
+            isUnstableLatched = isUnstableNetworkLatched
         )
         val clientInstalled = isClientInstalled(settings.activeProvider)
         val hasWireGuardPerm = wireguardBridge.hasControlPermission()
@@ -618,6 +795,8 @@ class VpnAutomationController(
             isHandshakePending = pendingNow,
             isPreemptiveTriggerActive = isPreemptiveActiveFlag,
             isManualOverrideActive = isManualOverrideActive,
+            isUnstableNetworkLatched = isUnstableNetworkLatched,
+            unstableLatchSummary = unstableLatchSummary,
             hasWireGuardPermission = hasWireGuardPerm,
             lastActionBanner = banner ?: _state.value.lastActionBanner
         )
@@ -631,14 +810,19 @@ class VpnAutomationController(
     }
 
     companion object {
+        const val FLAP_MAX_CYCLES = 5
+        const val FLAP_WINDOW_MS = 10_000L
+
         fun computePosture(
             snap: ActiveNetworkSnapshot,
             matched: TrustedNetworkEntity?,
             isHandshakePending: Boolean,
             isPreemptiveActive: Boolean = false,
-            isManualOverride: Boolean = false
+            isManualOverride: Boolean = false,
+            isUnstableLatched: Boolean = false
         ): VpnPosture {
             return when {
+                isUnstableLatched -> VpnPosture.UNSTABLE_LATCHED
                 snap.isVpnTunnelActive -> VpnPosture.VPN_ACTIVE
                 isPreemptiveActive -> VpnPosture.PREEMPTIVE_SHIELD
                 isHandshakePending -> VpnPosture.HANDSHAKE_PENDING

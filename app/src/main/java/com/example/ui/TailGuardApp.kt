@@ -295,7 +295,8 @@ fun TailGuardApp(
                                 onOpenSystemVpnSettings = { viewModel.openSystemVpnSettings(context) },
                                 onTestBroadcast = viewModel::onTestBroadcastClicked,
                                 onRefreshTelemetry = viewModel::refreshTelemetry,
-                                onRequestWireGuardPermission = handleRequestWireGuardPermission
+                                onRequestWireGuardPermission = handleRequestWireGuardPermission,
+                                onReleaseUnstableLatch = viewModel::releaseUnstableLatch
                             )
                         }
                     }
@@ -340,6 +341,7 @@ fun TailGuardApp(
                                 onTestBroadcast = viewModel::onTestBroadcastClicked,
                                 onRefreshTelemetry = viewModel::refreshTelemetry,
                                 onRequestWireGuardPermission = handleRequestWireGuardPermission,
+                                onReleaseUnstableLatch = viewModel::releaseUnstableLatch,
                                 modifier = contentModifier
                             )
                         }

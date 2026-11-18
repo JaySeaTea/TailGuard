@@ -40,6 +40,7 @@ fun MeshNodeIndicator(
             VpnPosture.VPN_ACTIVE,
             VpnPosture.TAILSCALE_ACTIVE -> MeshCyan
             VpnPosture.PREEMPTIVE_SHIELD -> Color(0xFF00E5FF)
+            VpnPosture.UNSTABLE_LATCHED,
             VpnPosture.KILL_SWITCH_LOCKDOWN -> LockdownAmber
             VpnPosture.HANDSHAKE_PENDING -> MeshCyan
             VpnPosture.TRUSTED_BYPASS -> SignalEmerald
@@ -110,7 +111,7 @@ fun MeshNodeIndicator(
                     cap = StrokeCap.Round
                 )
             }
-        } else if (posture == VpnPosture.KILL_SWITCH_LOCKDOWN) {
+        } else if (posture == VpnPosture.KILL_SWITCH_LOCKDOWN || posture == VpnPosture.UNSTABLE_LATCHED) {
             val edges = listOf(0 to 4, 2 to 4, 6 to 4, 8 to 4)
             for ((a, b) in edges) {
                 drawLine(
@@ -130,6 +131,7 @@ fun MeshNodeIndicator(
                 VpnPosture.TAILSCALE_ACTIVE -> idx in wireguardTNodes
                 VpnPosture.PREEMPTIVE_SHIELD -> idx in shieldDiamondNodes
                 VpnPosture.HANDSHAKE_PENDING -> idx in wireguardTNodes
+                VpnPosture.UNSTABLE_LATCHED,
                 VpnPosture.KILL_SWITCH_LOCKDOWN -> idx in lockdownXNodes
                 VpnPosture.TRUSTED_BYPASS -> idx in trustedRingNodes
                 VpnPosture.UNPROTECTED -> idx == 4
@@ -139,6 +141,7 @@ fun MeshNodeIndicator(
                 val dynamicAlpha = when (posture) {
                     VpnPosture.HANDSHAKE_PENDING,
                     VpnPosture.PREEMPTIVE_SHIELD,
+                    VpnPosture.UNSTABLE_LATCHED,
                     VpnPosture.KILL_SWITCH_LOCKDOWN -> pulsePhase
                     else -> 1f
                 }

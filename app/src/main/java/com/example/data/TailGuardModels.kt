@@ -30,6 +30,8 @@ enum class TransitionEventType {
     VPN_DISCONNECTED,
     PREEMPTIVE_CONNECT_TRIGGERED,
     EXPOSURE_ALERT_POSTED,
+    UNSTABLE_NETWORK_LATCHED,
+    UNSTABLE_LATCH_RELEASED,
     MANUAL_TOGGLE,
 
     // Legacy event types retained for database schema backward-compatibility
@@ -44,6 +46,7 @@ enum class TransitionEventType {
 enum class VpnPosture {
     VPN_ACTIVE,
     PREEMPTIVE_SHIELD,
+    UNSTABLE_LATCHED,
     HANDSHAKE_PENDING,
     TRUSTED_BYPASS,
     UNPROTECTED,

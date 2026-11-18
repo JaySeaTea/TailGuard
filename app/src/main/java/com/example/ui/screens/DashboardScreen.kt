@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SignalCellularAlt
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VpnLock
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Send
@@ -122,6 +123,7 @@ fun DashboardScreen(
     onTestBroadcast: () -> Unit,
     onRefreshTelemetry: () -> Unit,
     onRequestWireGuardPermission: () -> Unit = {},
+    onReleaseUnstableLatch: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalHapticFeedback.current
@@ -141,6 +143,17 @@ fun DashboardScreen(
                     onRapidToggle()
                 }
             )
+        }
+
+        if (uiState.isUnstableNetworkLatched) {
+            item {
+                UnstableNetworkLatchCard(
+                    providerName = uiState.settings.activeProvider.displayName,
+                    networkSummary = uiState.unstableLatchSummary,
+                    onResumeAutoGuard = onReleaseUnstableLatch,
+                    onOpenInternetPanel = onOpenInternetPanel
+                )
+            }
         }
 
         item {
@@ -210,6 +223,12 @@ private fun RapidToggleHeroCard(
             )
         }
     } else when (uiState.posture) {
+        VpnPosture.UNSTABLE_LATCHED -> Quad(
+            Color(0xFFFFB74D),
+            stringResource(R.string.posture_unstable_latched),
+            stringResource(R.string.posture_unstable_latched_desc, providerName),
+            Icons.Filled.Warning
+        )
         VpnPosture.VPN_ACTIVE,
         VpnPosture.TAILSCALE_ACTIVE -> Quad(
             scheme.primary,
@@ -441,6 +460,121 @@ private fun RapidToggleHeroCard(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UnstableNetworkLatchCard(
+    providerName: String,
+    networkSummary: String?,
+    onResumeAutoGuard: () -> Unit,
+    onOpenInternetPanel: () -> Unit
+) {
+    val amberAccent = Color(0xFFFFB74D)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("unstable_network_latch_card"),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = amberAccent.copy(alpha = 0.12f)
+        ),
+        border = BorderStroke(1.5.dp, amberAccent.copy(alpha = 0.55f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = amberAccent.copy(alpha = 0.2f),
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Filled.Warning,
+                            contentDescription = null,
+                            tint = amberAccent,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.latch_card_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (!networkSummary.isNullOrBlank()) {
+                        Text(
+                            text = networkSummary,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = JetBrainsMonoFamily,
+                            color = amberAccent
+                        )
+                    }
+                }
+            }
+
+            Text(
+                text = stringResource(R.string.latch_card_body_fmt, 5, providerName),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = onResumeAutoGuard,
+                    modifier = Modifier
+                        .weight(1.2f)
+                        .height(48.dp)
+                        .testTag("resume_auto_guard_button"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = amberAccent,
+                        contentColor = Color(0xFF1F1600)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.btn_resume_auto_guard),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = onOpenInternetPanel,
+                    modifier = Modifier
+                        .weight(0.9f)
+                        .height(48.dp)
+                        .testTag("latch_internet_panel_button"),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(stringResource(R.string.notif_action_open_internet_panel))
                 }
             }
         }
