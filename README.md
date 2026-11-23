@@ -24,7 +24,34 @@ Unlike conventional VPN wrappers, TailGuard **does not run an internal TUN inter
   - **WireGuard**: Commands `com.wireguard.android` via `SET_TUNNEL_UP` and `SET_TUNNEL_DOWN` intents with built-in runtime permission diagnostics.
 - **WireGuard Multi-Tunnel Selector**: Save and switch between multiple named tunnel profiles (e.g., `Home Router`, `ProtonVPN`, `wg0`) with deletion confirmation protection.
 - **Transition Audit Logs**: Chronological log of network shifts, RSSI alerts, and dispatched VPN intents with instant CSV export for troubleshooting.
+- **Unstable Network Cycling Protection**: Automatically detects 5 rapid connect/disconnect cycles in 10 seconds, latches your VPN **ON** to stop broadcast ping-pong, and alerts you with a 1-tap **Resume Auto-Guard** action.
 - **Modern Material 3 UI**: Edge-to-edge layout, responsive tablet navigation rail, dynamic dark/light theme, Quick Settings Tile, and 1x1 rapid toggle widget.
+
+---
+
+## 📖 Visual User Guide & State Reference
+
+New to TailGuard or want to see what each posture, icon, and notification means before triggering it on your phone? Check out the **[Complete Visual User Guide →](docs/USER_GUIDE.md)**.
+
+| Reference Guide | What It Covers |
+| :--- | :--- |
+| **[Icons, Mesh Matrix & Quick Surfaces](docs/USER_GUIDE.md#1-app-icons-33-mesh-matrix--quick-surfaces)** | Launcher icons, all 6 dynamic 3×3 Mesh Node states, 1×1 Home Widget labels, and Quick Settings Tile states |
+| **[Core Dashboard States](docs/USER_GUIDE.md#2-full-app-walkthrough-core-dashboard-states)** | Trusted Bypass, 5G VPN Protected, Pre-Emptive Wi-Fi Shield (`< -77 dBm`), and Unstable Network Latch |
+| **[WireGuard, Trusted Nets & Audit Logs](docs/USER_GUIDE.md#3-wireguard-mode-trusted-networks--transition-audit-logs)** | Manual Override mode, multi-tunnel WireGuard picker, zero-permission subnet rules, and CSV log filtering |
+| **[Persistent & Alert Notifications](docs/USER_GUIDE.md#4-persistent-foreground-notification--high-priority-alerts)** | Every foreground monitor notification variant plus 5G Exposure & Unstable Cycling heads-up alerts |
+
+<details>
+<summary><strong>Preview Visual Walkthrough Gallery</strong></summary>
+
+| Icons & Quick Surfaces | Core Dashboard States |
+| :---: | :---: |
+| [![TailGuard Icons & Indicators](docs/images/tailguard_icons_and_indicators.png)](docs/USER_GUIDE.md#1-app-icons-33-mesh-matrix--quick-surfaces) | [![TailGuard Core Dashboard States](docs/images/tailguard_app_states_dashboard.png)](docs/USER_GUIDE.md#2-full-app-walkthrough-core-dashboard-states) |
+
+| WireGuard, Trusted Nets & Logs | Persistent & Alert Notifications |
+| :---: | :---: |
+| [![TailGuard Screens](docs/images/tailguard_app_screens_wireguard_and_tabs.png)](docs/USER_GUIDE.md#3-wireguard-mode-trusted-networks--transition-audit-logs) | [![TailGuard Notifications](docs/images/tailguard_notifications_reference.png)](docs/USER_GUIDE.md#4-persistent-foreground-notification--high-priority-alerts) |
+
+</details>
 
 ---
 
